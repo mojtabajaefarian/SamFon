@@ -1,0 +1,18 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # مسدود کردن دسترسی مستقیم به پوشه‌ها
+    Options -Indexes
+    
+    # محافظت از فایل‌های حساس
+    <FilesMatch "\.(env|config|sql|log)$">
+        Deny from all
+    </FilesMatch>
+    
+    # مسدود کردن دسترسی به پوشه vendor
+    RewriteRule ^vendor/ - [F,L]
+</IfModule>
+
+# تنظیمات PHP
+php_value upload_max_filesize 20M
+php_value post_max_size 25M
