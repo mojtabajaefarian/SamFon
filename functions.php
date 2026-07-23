@@ -723,17 +723,24 @@ function generateReadableFormats($normalizedNumber, $originalFormat = null) {
 // =====================================================================
 // ██ تبدیل عدد به حروف فارسی (برای tooltip قیمت)
 // =====================================================================
-function numberToWordsFa($number): string {
-    $number = (int)$number;
-    if ($number === 0) return 'صفر';
-    
-    $yekan = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه'];
-    $dahgan = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود'];
-    $sadgan = ['', 'یکصد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد'];
-    $dahyek = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده'];
-    
-    function threeDigitToWords($num, $yekan, $dahgan, $sadgan, $dahyek) {
+// =====================================================================
+// ██ تبدیل عدد به حروف فارسی (برای tooltip قیمت)
+// ✅ اصلاح‌شده: threeDigitToWords از حالت nested خارج شد
+// =====================================================================
+
+/**
+ * تبدیل یک عدد ۳ رقمی به حروف فارسی
+ * ✅ تابع مستقل (نه nested) - جلوگیری از Cannot redeclare
+ */
+if (!function_exists('threeDigitToWordsFa')) {
+    function threeDigitToWordsFa(int $num): string {
         if ($num === 0) return '';
+        
+        $yekan  = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه'];
+        $dahgan = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود'];
+        $sadgan = ['', 'یکصد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد'];
+        $dahyek = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده'];
+        
         $parts = [];
         $sad = intdiv($num, 100);
         $rem = $num % 100;
@@ -751,34 +758,45 @@ function numberToWordsFa($number): string {
         
         return implode(' و ', $parts);
     }
-    
-    $result = [];
-    
-    // میلیارد
-    $billion = intdiv($number, 1000000000);
-    if ($billion > 0) {
-        $result[] = threeDigitToWords($billion, $yekan, $dahgan, $sadgan, $dahyek) . ' میلیارد';
+}
+
+/**
+ * تبدیل عدد کامل به حروف فارسی + تومان
+ */
+if (!function_exists('numberToWordsFa')) {
+    function numberToWordsFa($number): string {
+        $number = (int)$number;
+        if ($number === 0) return 'صفر تومان';
+        if ($number < 0) return 'منفی ' . numberToWordsFa(abs($number));
+        
+        $result = [];
+        
+        // میلیارد
+        $billion = intdiv($number, 1000000000);
+        if ($billion > 0) {
+            $result[] = threeDigitToWordsFa($billion) . ' میلیارد';
+        }
+        
+        // میلیون
+        $million = intdiv($number % 1000000000, 1000000);
+        if ($million > 0) {
+            $result[] = threeDigitToWordsFa($million) . ' میلیون';
+        }
+        
+        // هزار
+        $thousand = intdiv($number % 1000000, 1000);
+        if ($thousand > 0) {
+            $result[] = threeDigitToWordsFa($thousand) . ' هزار';
+        }
+        
+        // باقی‌مانده
+        $rest = $number % 1000;
+        if ($rest > 0) {
+            $result[] = threeDigitToWordsFa($rest);
+        }
+        
+        return implode(' و ', $result) . ' تومان';
     }
-    
-    // میلیون
-    $million = intdiv($number % 1000000000, 1000000);
-    if ($million > 0) {
-        $result[] = threeDigitToWords($million, $yekan, $dahgan, $sadgan, $dahyek) . ' میلیون';
-    }
-    
-    // هزار
-    $thousand = intdiv($number % 1000000, 1000);
-    if ($thousand > 0) {
-        $result[] = threeDigitToWords($thousand, $yekan, $dahgan, $sadgan, $dahyek) . ' هزار';
-    }
-    
-    // باقی
-    $rest = $number % 1000;
-    if ($rest > 0) {
-        $result[] = threeDigitToWords($rest, $yekan, $dahgan, $sadgan, $dahyek);
-    }
-    
-    return implode(' و ', $result) . ' تومان';
 }
 
 // =====================================================================
