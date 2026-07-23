@@ -370,6 +370,7 @@ require 'header.php';
 <!-- =====================================================================
      ۳. بردکرامب مدرن
      ===================================================================== -->
+<!-- بردکرامب: خانه / اپراتور / ۰۹۱۲ / کد ۵ / سیمکارت -->
 <div class="container">
     <nav class="modern-breadcrumb" aria-label="مسیر راهنما">
         <ol class="breadcrumb">
@@ -377,8 +378,19 @@ require 'header.php';
                 <a href="/"><i class="bi bi-house-door-fill"></i> خانه</a>
             </li>
             <li class="breadcrumb-item">
-                <a href="/search/<?= htmlspecialchars($breadcrumbPre) ?>">
-                    <i class="bi bi-phone-fill"></i> سیمکارت‌های <?= htmlspecialchars($breadcrumbPre) ?>
+                <a href="/simcards/operator/<?= htmlspecialchars(strtolower($displayOperator === 'همراه اول' ? 'mci' : ($displayOperator === 'ایرانسل' ? 'irancell' : ($displayOperator === 'رایتل' ? 'rightel' : 'mci')))) ?>">
+                    <?= getOperatorLogo($displayOperator, 20) ?>
+                    <?= htmlspecialchars($displayOperator) ?>
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/simcards/<?= htmlspecialchars($breadcrumbPre) ?>">
+                    <i class="bi bi-phone-fill"></i> <?= htmlspecialchars($breadcrumbPre) ?>
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/simcards/<?= htmlspecialchars($breadcrumbPre) ?>/code/<?= htmlspecialchars($displayCode) ?>">
+                    کد <?= htmlspecialchars($displayCode) ?>
                 </a>
             </li>
             <li class="breadcrumb-item active" aria-current="page">
