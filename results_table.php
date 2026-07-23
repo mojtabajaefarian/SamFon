@@ -155,7 +155,7 @@ $spacer = str_repeat(' ', $spaceCount);
                     $simLink = "/sim/" . $cleanSim;
                 ?>
 <!--                <tr <?= $trClass ?> data-toggle="expand" data-sim="<?= htmlspecialchars($cleanSim) ?>"> -->
-<tr class="<?= !empty($sim['special_sale']) ? 'special-row' : '' ?>">
+<tr class="<?= !empty($sim['special_sale']) ? 'special-row' : '' ?>" style="vertical-align: middle;" >
                     <td class="text-center" dir="ltr">
                         <a href="<?= $simLink ?>" class="text-decoration-none fw-bold text-primary"><?= htmlspecialchars($mainDisplay) ?></a>
                     </td>
