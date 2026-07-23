@@ -485,7 +485,7 @@ function handleDatabaseError(PDOException $e) {
  * تولید آرایه‌ای از فرمت‌های مختلف برای نمایش شماره (بدون HTML)
  */
 function getSimFormats($number) {
-    $cleaned = preg_replace('/\D/', '', $number);
+    $cleaned = preg_replace('/\D/', '', $number);  // ← \D (هر کاراکتر غیر عددی)
     if (strlen($cleaned) < 11) return [$number];
     $digits = str_split($cleaned);
     $formats = [];
@@ -506,7 +506,7 @@ function getSimFormats($number) {
  * تشخیص اپراتور بر اساس شماره سیم‌کارت
  */
 function detectOperator($number, $lookupTable) {
-    $cleaned = preg_replace('/\D/u', '', $number);
+    $cleaned = preg_replace('/\D/u', '', $number);  // ← \D (هر کاراکتر غیر عددی)
     if (strlen($cleaned) !== 11 || $cleaned[0] !== '0') return null;
     $prefixes = [substr($cleaned, 1, 4), substr($cleaned, 1, 3)];
     foreach ($prefixes as $prefix) {
