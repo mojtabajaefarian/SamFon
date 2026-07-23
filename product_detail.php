@@ -529,6 +529,31 @@ require 'header.php';
                         <i class="bi bi-tag-fill text-success me-2"></i>
                         قیمت و ثبت سفارش
                     </h4>
+
+<!-- ستون قیمت: با تولتیپ حروفی -->
+<div class="text-center mb-4 p-4 bg-light rounded-3">
+    <?php if (!empty($product['special_sale'])): ?>
+        <span class="vip-badge mb-2 d-inline-flex"><i class="bi bi-star-fill"></i> VIP</span>
+    <?php endif; ?>
+    <span class="text-muted text-decoration-line-through d-block small">قیمت مصرف‌کننده</span>
+    <div class="price-cell d-inline-block">
+        <h2 class="text-success fw-bold mb-1" dir="ltr"><?= number_format($displayPrice) ?></h2>
+        <div class="price-word-tooltip"><?= numberToWordsFa($displayPrice) ?></div>
+    </div>
+    <small class="text-muted">تومان</small>
+</div>
+
+<!-- مشخصات: لوگوی اپراتور -->
+<div class="col-6">
+    <div class="p-3 bg-light rounded d-flex align-items-center gap-2">
+        <?= getOperatorLogo($displayOperator, 36) ?>
+        <div>
+            <small class="text-muted d-block">اپراتور</small>
+            <strong><?= htmlspecialchars($displayOperator) ?></strong>
+        </div>
+    </div>
+</div>
+
                     <div class="text-center mb-4 p-4 bg-light rounded-3">
                         <span class="text-muted text-decoration-line-through d-block small">قیمت مصرف‌کننده</span>
                         <h2 class="text-success fw-bold mb-1" dir="ltr">
@@ -576,156 +601,175 @@ require 'header.php';
         سایر سیمکارت‌های پیشنهادی مشابه
     </h3>
     
-    <?php
-    try {
-        // ✅ کوئری اصلی: فیلتر بر اساس پیش‌شماره + کد خط (رفع باگ بی‌ربطی)
-        $sql = "SELECT sim_number, price, status 
-                FROM sim_cards 
-                WHERE pre_number = :pre3 
-                AND SUBSTRING(sim_number, 5, 1) = :code
-                AND sim_number != :simNumber 
-                AND price > 0
-                ORDER BY price ASC 
-                LIMIT 100";
+<?php
+try {
+    // کوئری اصلی: هم‌پیش‌شماره + هم‌کد
+    $sql = "SELECT sim_number, price, status, special_sale, updated_at
+            FROM sim_cards 
+            WHERE pre_number = :pre3 
+            AND SUBSTRING(sim_number, 5, 1) = :code
+            AND sim_number != :simNumber 
+            AND price > 0
+            ORDER BY price ASC 
+            LIMIT 200";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([':pre3' => $displayPre3, ':code' => $displayCode, ':simNumber' => $simNumber]);
+    $allCandidates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // کوئری هم‌قیمت (بدون فیلتر کد)
+    $minP = $displayPrice * 0.7;
+    $maxP = $displayPrice * 1.3;
+    $sqlPrice = "SELECT sim_number, price, status, special_sale, updated_at
+                 FROM sim_cards 
+                 WHERE pre_number = :pre3 AND sim_number != :simNumber 
+                 AND price BETWEEN :min AND :max AND price > 0
+                 ORDER BY price ASC LIMIT 20";
+    $stmtP = $conn->prepare($sqlPrice);
+    $stmtP->execute([':pre3' => $displayPre3, ':simNumber' => $simNumber, ':min' => (int)$minP, ':max' => (int)$maxP]);
+    $priceMatches = $stmtP->fetchAll(PDO::FETCH_ASSOC);
+    
+    $next3 = substr($simNumber, 4, 3);
+    
+    // ۶ دسته‌بندی
+    $categories = [
+        'premium' => [
+            'title' => '🏆 هم‌کد + سه رقم مشابه + هم‌قیمت',
+            'more_url' => "/simcards/{$displayPre3}/code/{$displayCode}",
+            'items' => []
+        ],
+        'code_price' => [
+            'title' => '⭐ هم‌کد + هم‌قیمت',
+            'more_url' => "/simcards/{$displayPre3}/code/{$displayCode}",
+            'items' => []
+        ],
+        'code_rond' => [
+            'title' => '✨ هم‌کد + رند',
+            'more_url' => "/simcards/{$displayPre3}/code/{$displayCode}",
+            'items' => []
+        ],
+        'pre_rond' => [
+            'title' => '💎 رند در همین پیش‌شماره',
+            'more_url' => "/simcards/{$displayPre3}/rond",
+            'items' => []
+        ],
+        'pre_price' => [
+            'title' => '💰 هم‌قیمت (کل پیش‌شماره)',
+            'more_url' => "/simcards/{$displayPre3}",
+            'items' => []
+        ],
+        'special' => [
+            'title' => '🔥 فروش ویژه هم‌کد',
+            'more_url' => "/simcards/{$displayPre3}/special",
+            'items' => []
+        ],
+    ];
+    
+    foreach ($allCandidates as $c) {
+        $cNum = $c['sim_number'];
+        $cPrice = (int)$c['price'];
+        $cNext3 = substr($cNum, 4, 3);
+        $cLast4 = substr($cNum, 7, 4);
+        $isRond = preg_match('/(\d)\1{2}/', $cLast4) || preg_match('/1234|2345|3456|4567|5678|(\d{2})\1/', $cLast4);
+        $inPrice = ($cPrice >= $minP && $cPrice <= $maxP);
         
-        $stmt = $conn->prepare($sql);
-        $stmt->execute([
-            ':pre3'      => $displayPre3,
-            ':code'      => $displayCode,
-            ':simNumber' => $simNumber
-        ]);
-        $allCandidates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $c['formatted'] = toEnglishDigitsAndClean(
+            substr($cNum,0,4).' '.substr($cNum,4,3).' '.substr($cNum,7,2).' '.substr($cNum,9,2), ' '
+        );
         
-        // امتیازدهی و دسته‌بندی
-        $categories = [
-            'premium'    => ['title' => '🏆 پیشنهادات ویژه (سه رقم مشابه + هم‌قیمت)', 'items' => []],
-            'code_match' => ['title' => '⭐ هم‌کد در محدوده قیمت', 'items' => []],
-            'rond'       => ['title' => '✨ شماره‌های رند هم‌کد', 'items' => []],
-        ];
-        
-        $next3    = substr($simNumber, 4, 3);
-        $minPrice = $displayPrice * 0.7;
-        $maxPrice = $displayPrice * 1.3;
-        
-        foreach ($allCandidates as $candidate) {
-            $candNum   = $candidate['sim_number'];
-            $candPrice = (int)$candidate['price'];
-            $candNext3 = substr($candNum, 4, 3);
-            $candLast4 = substr($candNum, 7, 4);
-            
-            $score    = 0;
-            $category = null;
-            
-            // دسته ۱: سه رقم مشابه + محدوده قیمت (بالاترین اولویت)
-            if ($candNext3 === $next3 && $candPrice >= $minPrice && $candPrice <= $maxPrice) {
-                $score    = 100;
-                $category = 'premium';
-            }
-            // دسته ۲: هم‌کد + محدوده قیمت
-            elseif ($candPrice >= $minPrice && $candPrice <= $maxPrice) {
-                $score    = 80;
-                $category = 'code_match';
-            }
-            
-            // دسته ۳: رند (بررسی جداگانه)
-            $isRond = preg_match('/(\d)\1{2}/', $candLast4) || 
-                      preg_match('/1234|2345|3456|4567|5678|6789|(\d{2})\1/', $candLast4);
-            if ($isRond && (empty($category) || $category === 'code_match')) {
-                $category = 'rond';
-                $score    = max($score, 70);
-            }
-            
-            if ($category && count($categories[$category]['items']) < 12) {
-                $candidate['score']     = $score;
-                $candidate['formatted'] = toEnglishDigitsAndClean(
-                    substr($candNum, 0, 4) . ' ' . substr($candNum, 4, 3) . ' ' . 
-                    substr($candNum, 7, 2) . ' ' . substr($candNum, 9, 2), ' '
-                );
-                $categories[$category]['items'][] = $candidate;
-            }
+        // دسته ۱: هم‌کد + سه رقم مشابه + هم‌قیمت
+        if ($cNext3 === $next3 && $inPrice && count($categories['premium']['items']) < 6) {
+            $categories['premium']['items'][] = $c;
         }
-        
-        // ✅ کوئری جداگانه برای هم‌قیمت‌ها (بدون فیلتر کد - از کل پیش‌شماره)
-        $sqlPrice = "SELECT sim_number, price, status 
-                     FROM sim_cards 
-                     WHERE pre_number = :pre3 
-                     AND sim_number != :simNumber 
-                     AND price BETWEEN :min AND :max
-                     AND price > 0
-                     ORDER BY price ASC 
-                     LIMIT 12";
-        $stmtPrice = $conn->prepare($sqlPrice);
-        $stmtPrice->execute([
-            ':pre3'      => $displayPre3,
-            ':simNumber' => $simNumber,
-            ':min'       => (int)$minPrice,
-            ':max'       => (int)$maxPrice
-        ]);
-        $priceMatches = $stmtPrice->fetchAll(PDO::FETCH_ASSOC);
-        
-        // اضافه کردن هم‌قیمت‌ها به دسته price_range
-        $categories['price_range'] = ['title' => '💰 هم‌قیمت‌ها (کل پیش‌شماره)', 'items' => []];
-        foreach ($priceMatches as $pm) {
-            if (count($categories['price_range']['items']) >= 12) break;
-            $pm['formatted'] = toEnglishDigitsAndClean(
-                substr($pm['sim_number'], 0, 4) . ' ' . substr($pm['sim_number'], 4, 3) . ' ' . 
-                substr($pm['sim_number'], 7, 2) . ' ' . substr($pm['sim_number'], 9, 2), ' '
-            );
-            $categories['price_range']['items'][] = $pm;
+        // دسته ۲: هم‌کد + هم‌قیمت
+        elseif ($inPrice && count($categories['code_price']['items']) < 6) {
+            $categories['code_price']['items'][] = $c;
         }
-        
-        // نمایش دسته‌ها
-        $hasAnySuggestion = false;
-        foreach ($categories as $cat): 
-            if (empty($cat['items'])) continue;
-            $hasAnySuggestion = true;
-        ?>
-            <div class="mb-4">
-                <div class="category-title">
-                    <span><?= htmlspecialchars($cat['title']) ?></span>
-                    <span class="badge bg-primary"><?= count($cat['items']) ?> مورد</span>
-                </div>
-                <div class="suggestion-scroll">
-                    <?php foreach ($cat['items'] as $sim): ?>
-                        <div class="card suggestion-card border-primary">
-                            <div class="card-body text-center p-3">
-                                <h6 class="fw-bold text-dark mb-2" dir="ltr" style="font-size: 1rem;">
-                                    <?= htmlspecialchars($sim['formatted']) ?>
-                                </h6>
-                                <p class="text-success mb-2 fw-bold">
-                                    <?= number_format((int)$sim['price']) ?> <small class="text-muted">تومان</small>
-                                </p>
-                                <a href="/sim/<?= htmlspecialchars($sim['sim_number']) ?>" 
-                                   class="btn btn-sm btn-primary w-100">
-                                    <i class="bi bi-eye-fill me-1"></i> مشاهده
-                                </a>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        <?php 
-        endforeach;
-        
-        if (!$hasAnySuggestion): 
-        ?>
-            <div class="alert alert-info text-center">
-                <i class="bi bi-info-circle-fill me-2"></i>
-                در حال حاضر سیمکارت مشابهی با این مشخصات موجود نیست. 
-                <a href="/search/<?= htmlspecialchars($breadcrumbPre) ?>" class="alert-link">
-                    مشاهده همه سیمکارت‌های <?= htmlspecialchars($breadcrumbPre) ?>
-                </a>
-            </div>
-        <?php 
-        endif;
-        
-    } catch (Exception $e) {
-        echo '<div class="alert alert-warning text-center">';
-        echo '<i class="bi bi-exclamation-triangle-fill me-2"></i>';
-        echo 'در بارگذاری پیشنهادات با مشکل مواجه شدیم. لطفاً صفحه را رفرش کنید.';
-        echo '</div>';
+        // دسته ۳: هم‌کد + رند
+        if ($isRond && count($categories['code_rond']['items']) < 6) {
+            $categories['code_rond']['items'][] = $c;
+        }
+        // دسته ۶: فروش ویژه
+        if (!empty($c['special_sale']) && count($categories['special']['items']) < 6) {
+            $categories['special']['items'][] = $c;
+        }
     }
+    
+    // دسته ۴: رند کل پیش‌شماره (از همان کوئری)
+    foreach ($allCandidates as $c) {
+        if (count($categories['pre_rond']['items']) >= 6) break;
+        $cLast4 = substr($c['sim_number'], 7, 4);
+        if (preg_match('/(\d)\1{2}/', $cLast4) || preg_match('/1234|2345|3456|4567|5678|(\d{2})\1/', $cLast4)) {
+            $c['formatted'] = toEnglishDigitsAndClean(
+                substr($c['sim_number'],0,4).' '.substr($c['sim_number'],4,3).' '.substr($c['sim_number'],7,2).' '.substr($c['sim_number'],9,2), ' '
+            );
+            $categories['pre_rond']['items'][] = $c;
+        }
+    }
+    
+    // دسته ۵: هم‌قیمت
+    foreach ($priceMatches as $pm) {
+        if (count($categories['pre_price']['items']) >= 6) break;
+        $pm['formatted'] = toEnglishDigitsAndClean(
+            substr($pm['sim_number'],0,4).' '.substr($pm['sim_number'],4,3).' '.substr($pm['sim_number'],7,2).' '.substr($pm['sim_number'],9,2), ' '
+        );
+        $categories['pre_price']['items'][] = $pm;
+    }
+    
+    $hasAny = false;
+    foreach ($categories as $cat):
+        if (empty($cat['items'])) continue;
+        $hasAny = true;
     ?>
+        <div class="mb-4">
+            <div class="category-title d-flex justify-content-between align-items-center">
+                <span><?= htmlspecialchars($cat['title']) ?></span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary"><?= count($cat['items']) ?> مورد</span>
+                    <a href="<?= htmlspecialchars($cat['more_url']) ?>" class="btn btn-sm btn-outline-primary rounded-pill">
+                        مشاهده بیشتر <i class="bi bi-arrow-left"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="suggestion-scroll">
+                <?php foreach ($cat['items'] as $sim): ?>
+                    <div class="card suggestion-card border-primary <?= !empty($sim['special_sale']) ? 'border-danger' : '' ?>">
+                        <div class="card-body text-center p-3">
+                            <?php if (!empty($sim['special_sale'])): ?>
+                                <span class="vip-badge mb-1"><i class="bi bi-star-fill"></i> VIP</span>
+                            <?php endif; ?>
+                            <h6 class="fw-bold text-dark mb-2" dir="ltr" style="font-size:0.95rem;">
+                                <?= htmlspecialchars($sim['formatted']) ?>
+                            </h6>
+                            <div class="price-cell d-inline-block mb-2">
+                                <p class="text-success fw-bold mb-0">
+                                    <?= number_format((int)$sim['price']) ?> <small class="text-muted">ت</small>
+                                </p>
+                                <div class="price-word-tooltip"><?= numberToWordsFa((int)$sim['price']) ?></div>
+                            </div>
+                            <a href="/sim/<?= htmlspecialchars($sim['sim_number']) ?>" 
+                               class="btn btn-sm btn-primary w-100">
+                                <i class="bi bi-eye-fill me-1"></i> مشاهده
+                            </a>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php
+    endforeach;
+    
+    if (!$hasAny): ?>
+        <div class="alert alert-info text-center">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            سیمکارت مشابهی یافت نشد.
+            <a href="/simcards/<?= htmlspecialchars($breadcrumbPre) ?>" class="alert-link">مشاهده همه <?= htmlspecialchars($breadcrumbPre) ?></a>
+        </div>
+    <?php endif;
+    
+} catch (Exception $e) {
+    echo '<div class="alert alert-warning text-center"><i class="bi bi-exclamation-triangle-fill me-2"></i>خطا در بارگذاری پیشنهادات.</div>';
+}
+?>
 
 </div>
 
